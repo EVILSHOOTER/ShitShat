@@ -75,6 +75,18 @@ let sendName = null;
 let sendHistoryRequest = null;
 let sendHistoryResponse = null;
 let joining = false;
+let everHadPeer = false;
+function setConnectionStatus(state) {
+  if (state === 'connected') everHadPeer = true;
+  const label = {connecting:'Connecting…', waiting: everHadPeer ? 'Re-connecting…' : 'Connecting…', connected:'Connected', disconnected:'Disconnected'};
+  const el = $('status'); el.textContent = label[state] || 'Disconnected';
+  el.dataset.connection = state;
+  el.title = state === 'waiting' ? 'No peers currently connected. Waiting for another visitor; signaling connectivity cannot be verified here.' :
+    state === 'connected' ? 'Connected to at least one peer' : '';
+}
+window.addEventListener('offline', () => setConnectionStatus('disconnected'));
+window.addEventListener('online', () => { if (room) setConnectionStatus(peers.size ? 'connected' : 'waiting'); });
+
 let unreadMessages = 0;
 let sidebarWidth = 155;
 let syncPending = false;
@@ -86,6 +98,29 @@ const badge = $('chatBadge');
 const content = $('chatContent');
 const messageBox = $('messages');
 
+function openAvatarPreview(source, name) {
+  const preview = $('avatarLightbox');
+  const holder = $('avatarLightboxImage');
+  holder.replaceChildren();
+  const image = makeAvatar(source, name, false);
+  image.classList.add('avatar-large');
+  holder.append(image);
+  $('avatarLightboxName').textContent = name || 'User';
+  preview.hidden = false;
+  $('avatarLightboxClose').focus();
+}
+$('avatarLightboxClose').addEventListener('click', () => { $('avatarLightbox').hidden = true; });
+$('avatarLightbox').addEventListener('click', e => { if (e.target === $('avatarLightbox')) $('avatarLightbox').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('avatarLightbox').hidden) $('avatarLightbox').hidden = true; });
+function clickableAvatar(source, name, inList = false) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'avatar-open';
+  button.title = 'View ' + name + "'s profile picture";
+  button.setAttribute('aria-label', button.title);
+  button.append(makeAvatar(source, name, inList));
+  button.addEventListener('click', () => openAvatarPreview(source, name));
+  return button;
+}
 function makeAvatar(source, name, inList = false) {
   const el = document.createElement('span');
   el.className = 'avatar' + (inList ? ' user-avatar' : ' message-avatar');
@@ -354,8 +389,17 @@ function renderMessages() {
     } else {
       const el = document.createElement('div'); el.className = 'message' + (entry.mine ? ' mine' : '');
       if (!entry.mine && isMentioned(entry.text)) el.classList.add('mentioned-me');
+      // On touch devices, tap the message itself to reveal its actions; tapping again hides them.
+      // Do not intercept links, username mentions, reactions or other controls.
+      el.addEventListener('click', event => {
+        if (!window.matchMedia('(hover: none)').matches) return;
+        if (event.target.closest('button, a, input, select, textarea')) return;
+        const wasOpen = el.classList.contains('touch-actions-open');
+        messageBox.querySelectorAll('.message.touch-actions-open').forEach(node => node.classList.remove('touch-actions-open'));
+        if (!wasOpen) el.classList.add('touch-actions-open');
+      });
       const layout = document.createElement('div'); layout.className = 'message-layout';
-      if (!hideAvatars) layout.append(makeAvatar(entry.avatar || (!entry.mine ? peers.get(entry.peerId)?.avatar : avatar), entry.name, false));
+      if (!hideAvatars) layout.append(clickableAvatar(entry.avatar || (!entry.mine ? peers.get(entry.peerId)?.avatar : avatar), entry.name, false));
       const messageContent = document.createElement('div'); messageContent.className = 'message-content';
       const meta = document.createElement('div'); meta.className = 'message-meta';
       const author = document.createElement('button'); author.type = 'button'; author.className = 'author author-ping'; author.textContent = entry.name; author.title = 'Mention @' + entry.name; author.style.color = entry.nameColour || DEFAULT_NAME_COLOUR; author.addEventListener('click', () => addPing(entry.name));
@@ -470,9 +514,9 @@ function renderUsers() {
     const li = document.createElement('li');
     const away = !user.me && Boolean(peers.get(user.id)?.away);
     const userAvatar = user.me ? avatar : peers.get(user.id)?.avatar;
-    const dot = makeAvatar(userAvatar, user.name, true);
-    dot.classList.toggle('away', away);
-    dot.title = away ? 'Away' : 'Online';
+    const dot = clickableAvatar(userAvatar, user.name, true);
+    dot.firstElementChild.classList.toggle('away', away);
+    dot.title = (away ? 'Away · ' : 'Online · ') + 'View ' + user.name + "'s picture";
     const name = document.createElement('span'); name.className = 'user-name' + (ignored ? ' ignored' : '');
     name.textContent = user.name + (user.me ? ' (you)' : ''); name.title = user.name;
     if (!ignored) name.style.color = user.me ? nameColour : (peers.get(user.id)?.nameColour || '');
@@ -581,7 +625,7 @@ async function startChat() {
   if (room || joining) return;
   const chosen = $('username').value.trim();
   if (!chosen) { $('joinError').textContent = 'Please enter your name.'; return; }
-  joining = true; myName = chosen.slice(0, 24);
+  joining = true; myName = chosen.slice(0, 24); setConnectionStatus('connecting');
   $('joinError').textContent = ''; $('joinBtn').disabled = true; $('joinBtn').textContent = 'Joining...';
   try {
     room = joinRoom({appId: APP_ID}, ROOM_ID);
@@ -681,6 +725,7 @@ async function startChat() {
       }
     };
     room.onPeerJoin = peerId => {
+      setConnectionStatus('connected');
       peers.set(peerId, {name: '', away: false});
       announcePresence(peerId);
       if (activeConversation === peerId) { $('messageInput').disabled = false; $('sendBtn').disabled = false; }
@@ -699,10 +744,11 @@ async function startChat() {
         $('conversationTitle').textContent += ' (offline)';
       }
       if (!syncCompleted) syncPending = false;
+      if (peers.size === 0) setConnectionStatus(navigator.onLine ? 'waiting' : 'disconnected');
     };
     $('joinScreen').hidden = true;
     $('messageInput').disabled = false; $('sendBtn').disabled = false;
-    $('status').textContent = 'Connected';
+    setConnectionStatus(peers.size ? 'connected' : 'waiting');
     $('settingsName').value = myName;
     renderUsers(); addSystem('Welcome, ' + myName + '!');
     addSystem('History may be loaded from another connected browser.');
@@ -712,7 +758,7 @@ async function startChat() {
     if (room) { try { room.leave(); } catch {} room = null; }
     sendChat = sendName = sendPrivate = sendHistoryRequest = sendHistoryResponse = sendTyping = sendReceipt = sendPresence = sendReaction = null;
     peers.clear(); ignoredPeers.clear(); renderUsers();
-    $('status').textContent = 'Not connected';
+    setConnectionStatus('disconnected');
     $('joinError').textContent = 'Chat error: ' + (error?.message || String(error));
     $('joinBtn').disabled = false; $('joinBtn').textContent = 'Join Chat';
   } finally { joining = false; }

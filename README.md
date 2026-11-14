@@ -11,11 +11,13 @@ features:
 - ignore button (IMPORTANT)
 - rich text features (not perfect)
 - some chat visual customisation settings
+- INTENTIONALLY limited
+
 
 ## how to use
-- save the files in your static site.
-- copy and paste the chatWidget div from index.html into your page's HTML. (you can delete index.html after that)
-- change the "APP_ID" variable to something else unique
+- save the files in your static site (except index.html ig)
+- add `<script src="/chat/embed.js" defer></script>` to any page
+- change the "APP_ID" variable to something else unique or else everyone's connecting to the same room lol
 
 
 ## talking for the sake of talking
