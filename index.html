@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Community Chat</title>
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+  <div class="demo-page">
+    <h1>My Website</h1>
+    <p>Click the chat icon in the bottom-right corner.</p>
+  </div>
+
+  <div id="chatWidget" class="chat-widget">
+    <button id="chatToggle" class="chat-toggle" type="button" aria-label="Open chat" aria-expanded="false" aria-controls="chatPanel">
+      💬 <span id="chatBadge" class="chat-badge" hidden>0</span>
+    </button>
+
+    <section id="chatPanel" class="chat-panel" aria-label="Community chat" hidden>
+      <div id="chatResize" class="chat-resize-handle" title="Drag to resize chat"></div>
+      <header class="chat-header">
+        <div class="chat-heading">
+          <strong>Community Chat</strong>
+          <small><span id="status">Not connected</span> · <span id="count">0</span> online</small>
+        </div>
+        <div class="header-buttons">
+          <button id="settingsToggle" class="header-button" type="button" title="Chat settings" aria-label="Chat settings">⚙</button>
+          <button id="usersToggle" class="header-button" type="button" title="Show/hide users" aria-label="Hide online users" aria-expanded="true">👥</button>
+          <button id="chatMinimize" class="header-button" type="button" aria-label="Minimize chat">−</button>
+        </div>
+      </header>
+
+      <div id="chatContent" class="chat-content">
+        <aside class="chat-sidebar">
+          <h2>Online Users</h2>
+          <ul id="users"></ul>
+        </aside>
+        <div id="sidebarResize" class="sidebar-resize-handle" role="separator" aria-label="Resize user list" aria-orientation="vertical" tabindex="0"></div>
+        <main class="chat-main">
+          <div id="settingsScreen" class="settings-screen" hidden>
+            <div class="settings-title"><strong>Settings</strong><button id="settingsClose" type="button" aria-label="Close settings">✕</button></div>
+            <label class="settings-field">Display name
+              <span class="settings-name"><input id="settingsName" maxlength="24" autocomplete="nickname"><button id="saveName" type="button">Save</button></span>
+            </label>
+            <div class="settings-field">
+              <span>Profile picture</span>
+              <div class="avatar-settings-row">
+                <span id="avatarPreview" class="avatar avatar-preview" aria-label="Your profile picture"></span>
+                <div class="avatar-settings-actions">
+                  <label class="avatar-upload-label" for="avatarFile">Upload picture</label>
+                  <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                  <button id="removeAvatar" type="button">Remove picture</button>
+                </div>
+              </div>
+              <small class="avatar-hint">Pictures are cropped to a square and compressed before sharing with connected visitors.</small>
+            </div>
+            <label class="settings-field">Profile picture corners <output id="avatarRadiusValue">20%</output>
+              <input id="avatarRadiusSlider" type="range" min="0" max="50" step="2" value="10">
+            </label>
+            <label class="settings-check"><input id="compactMode" type="checkbox"> Compact chat mode (RTC-style)</label>
+            <label class="settings-field">Chat density <output id="densityValue">100%</output>
+              <input id="densitySlider" type="range" min="75" max="125" step="5" value="100">
+            </label>
+            <label class="settings-field">Your name colour
+              <span class="colour-setting"><input id="nameColour" type="color" value="#a5c4ff" aria-label="Name colour"><output id="nameColourValue">#a5c4ff</output><button id="resetNameColour" type="button">Reset</button></span>
+            </label>
+            <label class="settings-field">Your message bubble colour
+              <span class="colour-setting"><input id="bubbleColour" type="color" value="#304f92" aria-label="Message bubble colour"><output id="bubbleColourValue">#304f92</output><button id="resetBubbleColour" type="button">Reset</button></span>
+            </label>
+            <label class="settings-field">Chat colour theme
+              <select id="chatTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
+            </label>
+            <label class="settings-field">Online user list position
+              <select id="sidebarPosition"><option value="left">Left</option><option value="right">Right</option></select>
+            </label>
+            <label class="settings-check"><input id="hideReceipts" type="checkbox"> Hide read receipts</label>
+            <label class="settings-check"><input id="hideTimestamps" type="checkbox"> Hide message timestamps</label>
+            <label class="settings-check"><input id="hideTyping" type="checkbox"> Hide typing indicators</label>
+            <label class="settings-check"><input id="hideAvatars" type="checkbox"> Hide profile pictures in chat messages</label>
+            <label class="settings-check"><input id="hideImages" type="checkbox"> Automatically hide images (click to reveal)</label>
+            <label class="settings-check"><input id="advancedFormatting" type="checkbox"> Advanced chat settings (Font, Size and Text colour)</label>
+            <p class="settings-hint">These appearance preferences are saved in this browser.</p>
+          </div>
+          <div class="conversation-bar"><button id="backToPublic" type="button" hidden>← Public</button><strong id="conversationTitle">Public room</strong></div>
+          <div id="messages" role="log" aria-label="Chat messages" aria-live="polite"></div>
+          <div id="typingIndicator" class="typing-indicator" role="status" aria-live="polite" hidden></div>
+          <div class="composer">
+            <div id="replyPreview" class="reply-preview" hidden><span id="replyPreviewText"></span><button id="cancelReply" type="button" aria-label="Cancel reply">✕</button></div>
+            <div class="format-toolbar" aria-label="Message formatting">
+              <button type="button" data-format="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button type="button" data-format="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+              <button type="button" data-format="strike" title="Strikethrough"><s>S</s></button>
+              <button type="button" data-format="code" title="Inline code">&lt;/&gt;</button>
+              <button type="button" data-format="spoiler" title="Spoiler">◈</button>
+              <button type="button" data-format="link" title="Insert link">🔗</button>
+              <label class="format-picker advanced-format" title="Font for selected or next text">Font <select id="fontPicker" aria-label="Font family"><option value="">Choose…</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Monospace</option><option value="comic">Comic</option><option value="cursive">Cursive</option></select></label>
+              <label class="format-picker advanced-format" title="Size for selected or next text">Size <select id="fontSizePicker" aria-label="Text size"><option value="">Choose…</option><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label>
+              <label class="format-picker advanced-format" title="Colour for selected or next text">Text <input id="textColourPicker" type="color" value="#ffffff" aria-label="Text colour"></label>
+              <button type="button" id="emojiToggle" title="Emoji">☺</button>
+              <button type="button" id="imageAttach" title="Attach an image" aria-label="Attach image">🖼</button>
+              <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+              <div id="emojiPicker" class="emoji-picker" hidden></div>
+            </div>
+            <div id="imagePreview" class="image-preview" hidden></div>
+            <form id="messageForm">
+              <textarea id="messageInput" maxlength="2000" rows="2" placeholder="Type a message... (Enter to send)" aria-label="Chat message" disabled></textarea>
+              <button id="sendBtn" type="submit" disabled>Send</button>
+            </form>
+          </div>
+          <div id="joinScreen" class="join-screen">
+            <h2>Join the chat</h2>
+            <p>Choose a display name to start chatting.</p>
+            <input id="username" maxlength="24" placeholder="Your display name" autocomplete="nickname">
+            <button id="joinBtn" type="button">Join Chat</button>
+            <div id="joinError" role="alert"></div>
+          </div>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="chat.js"></script>
+</body>
+</html>
