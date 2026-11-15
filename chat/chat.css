@@ -1056,3 +1056,7 @@ body.sidebar-resizing, body.sidebar-resizing * { user-select: none !important; c
 .chat-widget .mention-suggestion:hover, .chat-widget .mention-suggestion.selected { background: #486a9e; color: white; }
 .chat-widget[data-theme="light"] .mention-suggestions { background: #f0f4fa; color: #25344c; border-color: #a4b3ca; }
 .chat-widget[data-theme="light"] .mention-suggestion:hover, .chat-widget[data-theme="light"] .mention-suggestion.selected { background: #cbdaf1; color: #182f54; }
+
+/* Sound settings buttons match the current theme. */
+.chat-widget .settings-group #soundUseSite,.chat-widget .settings-group #soundRemove,.chat-widget .settings-group #soundTest { border:0; border-radius:5px; padding:6px 9px; background:#263653; color:#e8ecf7; cursor:pointer; }
+.chat-widget[data-theme="light"] .settings-group #soundUseSite,.chat-widget[data-theme="light"] .settings-group #soundRemove,.chat-widget[data-theme="light"] .settings-group #soundTest { background:#dce5f2; color:#263347; }

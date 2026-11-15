@@ -80,6 +80,20 @@
             <label class="settings-check"><input id="hideImages" type="checkbox"> Automatically hide images (click to reveal)</label>
             <label class="settings-check"><input id="advancedFormatting" type="checkbox"> Advanced chat settings (Font, Size and Text colour)</label>
             </div></details>
+            <details class="settings-group"><summary>Message sounds <span>⌄</span></summary><div class="settings-group-body">
+              <div class="settings-field"><span>Notification sound</span>
+                <div class="bg-upload-actions"><label class="avatar-upload-label" for="soundFile">Upload sound</label><input id="soundFile" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4" hidden><button id="soundUseSite" type="button">Use site sound</button><button id="soundRemove" type="button">No sound</button><button id="soundTest" type="button">Test ▶</button></div>
+                <small id="soundStatus" class="settings-hint">No sound selected</small>
+              </div>
+              <label class="settings-field">Volume <output id="soundVolumeValue">60%</output><input id="soundVolume" type="range" min="0" max="100" step="5" value="60"></label>
+              <div class="settings-checks">
+                <label class="settings-check"><input id="soundOther" type="checkbox" checked> Other users' messages</label>
+                <label class="settings-check"><input id="soundOwn" type="checkbox"> Your own messages</label>
+                <label class="settings-check"><input id="soundPing" type="checkbox" checked> Messages mentioning you</label>
+                <label class="settings-check"><input id="soundDm" type="checkbox" checked> Private messages to you</label>
+              </div>
+              <small class="settings-hint">Ignored users never trigger sounds. Browsers may require a click or tap before audio can play.</small>
+            </div></details>
             <p class="settings-hint">These appearance preferences are saved in this browser.</p>
           </div>
           <div id="avatarLightbox" class="avatar-lightbox" hidden role="dialog" aria-modal="true" aria-label="Profile picture preview"><div class="avatar-lightbox-card"><button id="avatarLightboxClose" type="button" aria-label="Close profile picture preview">✕</button><div id="avatarLightboxImage"></div><strong id="avatarLightboxName"></strong></div></div>

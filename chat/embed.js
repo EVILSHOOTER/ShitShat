@@ -11,7 +11,8 @@
     'sidebarWidth','sidebarPosition','compactMode','density','avatarRadius',
     'hideImages','hideAvatars','hideTyping','hideReceipts','hideTimestamps',
     'advancedFormatting','nameColour','bubbleColour','widgetWidth','widgetHeight',
-    'historyLimit','awayMinutes','longMessageChars','longMessageLines'];
+    'historyLimit','awayMinutes','longMessageChars','longMessageLines',
+    'soundUrl','soundVolume','soundOther','soundOwn','soundPing','soundDm'];
   async function mount() {
     try {
       const response = await fetch(new URL('widget.html', base));

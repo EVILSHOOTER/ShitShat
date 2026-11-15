@@ -97,6 +97,104 @@ function setConnectionStatus(state) {
 window.addEventListener('offline', () => setConnectionStatus('disconnected'));
 window.addEventListener('online', () => { if (room) setConnectionStatus(peers.size ? 'connected' : 'waiting'); });
 
+// Sound notifications: no built-in audio. Site attributes provide optional defaults.
+// Browser autoplay policies may require the visitor to interact with the page first.
+const SOUND_STORE_KEY = 'community-chat-message-sound-v1';
+const SOUND_MAX_BYTES = 3 * 1024 * 1024;
+const soundDefaults = {
+  other: configBoolean('soundOther', true),
+  own: configBoolean('soundOwn', false),
+  ping: configBoolean('soundPing', true),
+  dm: configBoolean('soundDm', true)
+};
+const validSoundUrl = value => {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try { const url = new URL(value.trim(), location.href); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; }
+  catch { return ''; }
+};
+let soundObjectUrl = null;
+let soundUploadBlob = null;
+let soundUrl = validSoundUrl(roomConfig.soundUrl);
+let soundVolume = configNumber('soundVolume', 60, 0, 100);
+let soundOther = soundDefaults.other, soundOwn = soundDefaults.own;
+let soundPing = soundDefaults.ping, soundDm = soundDefaults.dm;
+let soundChoice = 'default';
+let soundReady = false;
+let audioUnlocked = false;
+let audioNoticeShown = false;
+const soundPlayer = new Audio();
+soundPlayer.preload = 'auto';
+function soundDB(mode, callback) {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) { reject(new Error('Browser storage unavailable')); return; }
+    const request = indexedDB.open('community-chat-sound-store', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('audio');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('audio', mode);
+      const req = callback(tx.objectStore('audio'));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+function updateSoundSource() {
+  if (soundObjectUrl) { URL.revokeObjectURL(soundObjectUrl); soundObjectUrl = null; }
+  if (soundChoice === 'upload' && soundUploadBlob) soundObjectUrl = URL.createObjectURL(soundUploadBlob);
+  const url = soundChoice === 'none' ? '' : (soundObjectUrl || (soundChoice === 'default' ? soundUrl : ''));
+  soundPlayer.pause();
+  soundPlayer.removeAttribute('src');
+  if (url) soundPlayer.src = url;
+  soundPlayer.volume = soundVolume / 100;
+  $('soundStatus').textContent = soundChoice === 'none' ? 'No sound selected' :
+    soundChoice === 'upload' ? (soundUploadBlob ? 'Uploaded sound selected' : 'Uploaded sound unavailable') :
+    soundUrl ? 'Website sound selected' : 'No sound selected';
+}
+function saveSoundPreferences() {
+  save('community-chat-sound-preferences-v1', {soundChoice, soundVolume, soundOther, soundOwn, soundPing, soundDm});
+  $('soundVolume').value = String(soundVolume);
+  $('soundVolumeValue').textContent = soundVolume + '%';
+  $('soundOther').checked = soundOther;
+  $('soundOwn').checked = soundOwn;
+  $('soundPing').checked = soundPing;
+  $('soundDm').checked = soundDm;
+  updateSoundSource();
+}
+function playMessageSound(kind, mentioned = false) {
+  if (!soundReady || !soundPlayer.src || !soundVolume) return;
+  // A matching category plays exactly once, even if it is also a ping or DM.
+  const enabled = (kind === 'own' && soundOwn) ||
+    (kind === 'dm' && (soundDm || (mentioned && soundPing))) ||
+    (kind === 'other' && (soundOther || (mentioned && soundPing)));
+  if (!enabled) return;
+  try {
+    soundPlayer.pause(); soundPlayer.currentTime = 0;
+    const result = soundPlayer.play();
+    if (result?.then) result.then(() => { audioUnlocked = true; }).catch(error => {
+      if (error.name === 'NotAllowedError' && !audioNoticeShown) {
+        audioNoticeShown = true;
+        console.info('[Community Chat] Sound requires a click or tap on this page first.');
+      }
+    });
+  } catch (error) { console.warn('[Community Chat] Sound playback failed:', error); }
+}
+async function initSoundSettings() {
+  const p = load('community-chat-sound-preferences-v1', {});
+  soundVolume = Number.isFinite(p.soundVolume) ? clamp(p.soundVolume, 0, 100) : soundVolume;
+  soundOther = typeof p.soundOther === 'boolean' ? p.soundOther : soundOther;
+  soundOwn = typeof p.soundOwn === 'boolean' ? p.soundOwn : soundOwn;
+  soundPing = typeof p.soundPing === 'boolean' ? p.soundPing : soundPing;
+  soundDm = typeof p.soundDm === 'boolean' ? p.soundDm : soundDm;
+  soundChoice = ['default','upload','none'].includes(p.soundChoice) ? p.soundChoice : 'default';
+  try { soundUploadBlob = await soundDB('readonly', store => store.get(SOUND_STORE_KEY)); }
+  catch (error) { console.info('[Community Chat] Uploaded sound storage unavailable:', error); }
+  if (soundChoice === 'upload' && !soundUploadBlob) soundChoice = 'none';
+  soundReady = true;
+  saveSoundPreferences();
+}
+
 let unreadMessages = 0;
 let sidebarWidth = configNumber('sidebarWidth', 130, 65, 500);
 let syncPending = false;
@@ -698,6 +796,7 @@ async function startChat() {
       const entry = cleanMessage({nameColour: validColour(data.nameColour) || peers.get(peerId).nameColour, bubbleColour: data.bubbleColour, avatar: validAvatar(data.avatar) || peers.get(peerId).avatar, replyTo: data.replyTo, replyName: data.replyName, replyText: data.replyText, id: typeof data.id === 'string' ? data.id : `${peerId}:${Date.now()}:${Math.random()}`, name, text, image: data.image, ts: Number.isFinite(data.ts) ? data.ts : Date.now(), peerId});
       if (entry) {
         appendPrivate(peerId, entry, !ignoredPeers.has(peerId));
+        if (!ignoredPeers.has(peerId)) playMessageSound('dm', isMentioned(entry.text));
         receiptFor(peerId, entry.id, 'delivered');
         queueSeen(peerId, entry.id, 'private');
       }
@@ -713,7 +812,7 @@ async function startChat() {
         id: typeof data.id === 'string' ? data.id : `${peerId}:${Date.now()}:${Math.random()}`,
         name, text, image: data.image, ts: Number.isFinite(data.ts) ? data.ts : Date.now(), peerId, nameColour: data.nameColour || peers.get(peerId).nameColour, bubbleColour: data.bubbleColour, avatar: validAvatar(data.avatar) || peers.get(peerId).avatar, replyTo: data.replyTo, replyName: data.replyName, replyText: data.replyText
       });
-      if (entry) { receiptFor(peerId, entry.id, 'delivered'); queueSeen(peerId, entry.id, 'public'); }
+      if (entry) { receiptFor(peerId, entry.id, 'delivered'); queueSeen(peerId, entry.id, 'public'); if (!ignoredPeers.has(peerId)) playMessageSound('other', isMentioned(entry.text)); }
       typingPeers.delete(peerId); refreshTypingIndicator();
     };
     nameAction.onMessage = (value, {peerId} = {}) => {
@@ -797,12 +896,13 @@ $('messageForm').addEventListener('submit', async event => {
     if (!peers.has(target)) { input.value = text; pendingImage = image; updateImagePreview(); return; }
     const entry = cleanMessage({id: `${sessionId}:${++sequence}`, name: myName, text, image, ts: Date.now(), peerId: target, nameColour, bubbleColour, avatar, ...reply});
     if (!entry) return;
-    entry.mine = true; appendPrivate(target, entry);
+    entry.mine = true; appendPrivate(target, entry); playMessageSound('own');
     try { await sendPrivate({id: entry.id, text, image, ts: entry.ts, nameColour: entry.nameColour, bubbleColour: entry.bubbleColour, avatar: entry.avatar, ...reply}, {target}); }
     catch (error) { console.error('Private message failed:', error); addSystem('Private message delivery failed.'); }
   } else {
     const entry = addMessage(myName, text, true, '', {id: `${sessionId}:${++sequence}`, name: myName, text, image, ts: Date.now(), nameColour, bubbleColour, avatar, ...reply});
     if (!entry) return;
+    playMessageSound('own');
     try { await sendChat({id: entry.id, text, image, ts: entry.ts, nameColour: entry.nameColour, bubbleColour: entry.bubbleColour, avatar: entry.avatar, ...reply}); }
     catch (error) { console.error('Message sending failed:', error); addSystem('Message delivery failed.'); }
   }
@@ -1323,3 +1423,39 @@ window.addEventListener('pagehide', () => { if (room) { try { room.leave(); } ca
 setChatOpen(false);
 
 restoreGifBackground().then(() => loadConfiguredBackground());
+
+// Sound settings controls. Uploaded audio stays on this browser, not sent over P2P.
+$('soundFile').addEventListener('change', async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const allowed = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4'];
+    if (!allowed.includes(file.type) || file.size > SOUND_MAX_BYTES)
+      throw new Error('Choose an MP3, WAV, OGG, WebM or M4A audio file under 3 MB.');
+    await soundDB('readwrite', store => store.put(file, SOUND_STORE_KEY));
+    soundUploadBlob = file; soundChoice = 'upload'; saveSoundPreferences();
+  } catch (error) { alert(error.message || 'Could not save the audio file.'); }
+  finally { event.target.value = ''; }
+});
+$('soundRemove').addEventListener('click', async () => {
+  soundUploadBlob = null; soundChoice = 'none';
+  try { await soundDB('readwrite', store => store.delete(SOUND_STORE_KEY)); } catch {}
+  saveSoundPreferences();
+});
+$('soundUseSite').addEventListener('click', () => { soundChoice = 'default'; saveSoundPreferences(); });
+$('soundVolume').addEventListener('input', event => { soundVolume = clamp(Number(event.target.value), 0, 100); saveSoundPreferences(); });
+for (const [id, key] of [['soundOther','soundOther'],['soundOwn','soundOwn'],['soundPing','soundPing'],['soundDm','soundDm']]) {
+  $(id).addEventListener('change', event => { if (key === 'soundOther') soundOther = event.target.checked;
+    if (key === 'soundOwn') soundOwn = event.target.checked;
+    if (key === 'soundPing') soundPing = event.target.checked;
+    if (key === 'soundDm') soundDm = event.target.checked;
+    saveSoundPreferences();
+  });
+}
+$('soundTest').addEventListener('click', () => {
+  if (!soundPlayer.src) { $('soundStatus').textContent = 'Choose a sound first'; return; }
+  soundPlayer.pause(); soundPlayer.currentTime = 0; soundPlayer.play().catch(error => {
+    $('soundStatus').textContent = 'Could not play this sound (' + error.name + ')';
+  });
+});
+initSoundSettings();
