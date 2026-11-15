@@ -1048,3 +1048,11 @@ body.sidebar-resizing, body.sidebar-resizing * { user-select: none !important; c
 /* Keep sidebar usernames legible in the light theme even with custom name colours. */
 .chat-widget[data-theme="light"] #users .user-name:not(.ignored) { color:#263f64 !important; }
 .chat-widget[data-theme="light"].has-chat-background #users .user-name:not(.ignored) { color:var(--bg-text) !important; }
+
+/* Mention autocomplete: positioned above the composer, usable with mouse and touch. */
+.chat-widget .mention-suggestions[hidden] { display: none !important; }
+.chat-widget .mention-suggestions { position: absolute; z-index: 25; bottom: calc(100% - 4px); left: 8px; right: 8px; max-height: 185px; overflow-y: auto; background: var(--panel, #1b2941); color: var(--text, #eef3ff); border: 1px solid #7182a2; border-radius: 8px; padding: 4px; box-shadow: 0 5px 22px #0006; }
+.chat-widget .mention-suggestion { display: block; width: 100%; text-align: left; padding: 9px 11px; border: 0; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-widget .mention-suggestion:hover, .chat-widget .mention-suggestion.selected { background: #486a9e; color: white; }
+.chat-widget[data-theme="light"] .mention-suggestions { background: #f0f4fa; color: #25344c; border-color: #a4b3ca; }
+.chat-widget[data-theme="light"] .mention-suggestion:hover, .chat-widget[data-theme="light"] .mention-suggestion.selected { background: #cbdaf1; color: #182f54; }

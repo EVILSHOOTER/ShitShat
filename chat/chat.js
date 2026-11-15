@@ -42,7 +42,7 @@ const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥
 let sendReaction = null;
 function addPing(name) {
   const input = $('messageInput');
-  const mention = '@' + name + ' ';
+  const mention = '@[' + name + '] ';
   const pos = input.selectionStart ?? input.value.length;
   const prefix = pos > 0 && !/\s/.test(input.value[pos - 1]) ? ' ' : '';
   input.setRangeText(prefix + mention, pos, input.selectionEnd ?? pos, 'end');
@@ -350,29 +350,34 @@ function setReply(entry) {
   $('messageInput').focus();
 }
 $('cancelReply').addEventListener('click', clearReply);
+// Bracketed mentions keep names containing spaces unambiguous.
+// Legacy @Name mentions remain supported for compatibility.
 function isMentioned(text) {
   if (!myName || !text) return false;
-  const escaped = myName.replace(/[^a-zA-Z0-9_]/g, char => '\\' + char);
+  const bracketed = /@\[([^\]\r\n]{1,40})\]/g;
+  for (const match of text.matchAll(bracketed)) {
+    if (match[1].toLocaleLowerCase() === myName.toLocaleLowerCase()) return true;
+  }
+  const escaped = myName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('(^|[^\\w])@' + escaped + '(?![\\w])', 'i').test(text);
 }
 function decorateMentions(container) {
-  if (!myName) return;
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (node.parentElement?.closest('a,code,button')) continue;
-    const pattern = /@([\w.-]+)/g;
-    const text = node.textContent;
-    if (!pattern.test(text)) continue;
+    const pattern = /@\[([^\]\r\n]{1,40})\]|@([\w.-]+)/g;
+    const value = node.textContent;
+    if (!pattern.test(value)) continue;
     pattern.lastIndex = 0;
     const frag = document.createDocumentFragment(); let last = 0, match;
-    while ((match = pattern.exec(text))) {
-      frag.append(document.createTextNode(text.slice(last, match.index)));
+    while ((match = pattern.exec(value))) {
+      frag.append(document.createTextNode(value.slice(last, match.index)));
       const span = document.createElement('span'); span.className = 'chat-mention';
-      span.textContent = match[0]; frag.append(span); last = pattern.lastIndex;
+      span.textContent = '@' + (match[1] || match[2]); frag.append(span); last = pattern.lastIndex;
     }
-    frag.append(document.createTextNode(text.slice(last)));
+    frag.append(document.createTextNode(value.slice(last)));
     node.replaceWith(frag);
   }
 }
@@ -786,7 +791,7 @@ $('messageForm').addEventListener('submit', async event => {
   const image = pendingImage;
   if (!text && !image) return;
   const reply = pendingReply ? {...pendingReply} : {};
-  input.value = ''; pendingImage = null; clearReply(); updateImagePreview(); announceTyping(false);
+  closeMentionMenu(); input.value = ''; pendingImage = null; clearReply(); updateImagePreview(); announceTyping(false);
   if (activeConversation !== null) {
     const target = activeConversation;
     if (!peers.has(target)) { input.value = text; pendingImage = image; updateImagePreview(); return; }
@@ -861,14 +866,68 @@ function noteActivity() {
 ['pointerdown','keydown','touchstart','wheel'].forEach(type => document.addEventListener(type, noteActivity, {passive: true}));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') lastActivity = Date.now(); updatePresence(); });
 setInterval(updatePresence, 15000);
+// Mention suggestions are scoped to the active conversation and never inject HTML.
+const mentionMenu = $('mentionSuggestions');
+let mentionCandidates = [];
+let mentionSelection = 0;
+let mentionRange = null;
+function closeMentionMenu() {
+  mentionMenu.hidden = true; mentionMenu.replaceChildren(); mentionCandidates = []; mentionRange = null;
+}
+function updateMentionMenu() {
+  const input = $('messageInput');
+  if (input.disabled || document.activeElement !== input || input.selectionStart !== input.selectionEnd) { closeMentionMenu(); return; }
+  const caret = input.selectionStart;
+  const before = input.value.slice(0, caret);
+  const match = /(^|[\s(])@([^@\n\r\[\]]{0,40})$/.exec(before);
+  if (!match) { closeMentionMenu(); return; }
+  const search = match[2].toLocaleLowerCase();
+  const names = [...peers.entries()]
+    .filter(([id]) => !ignoredPeers.has(id) && (activeConversation === null || activeConversation === id))
+    .map(([, peer]) => typeof peer === 'string' ? peer : peer.name)
+    .filter(name => typeof name === 'string' && name.trim());
+  const unique = [...new Set(names)];
+  mentionCandidates = unique.filter(name => name.toLocaleLowerCase().includes(search)).slice(0, 8);
+  if (!mentionCandidates.length) { closeMentionMenu(); return; }
+  mentionRange = [caret - match[2].length - 1, caret];
+  mentionSelection = Math.min(mentionSelection, mentionCandidates.length - 1);
+  mentionMenu.replaceChildren();
+  mentionCandidates.forEach((name, index) => {
+    const item = document.createElement('button'); item.type = 'button';
+    item.className = 'mention-suggestion' + (index === mentionSelection ? ' selected' : '');
+    item.textContent = '@' + name;
+    item.setAttribute('role', 'option'); item.setAttribute('aria-selected', String(index === mentionSelection));
+    item.addEventListener('pointerdown', e => e.preventDefault());
+    item.addEventListener('click', () => chooseMention(index));
+    mentionMenu.append(item);
+  });
+  mentionMenu.hidden = false;
+}
+function chooseMention(index) {
+  const name = mentionCandidates[index];
+  if (!name || !mentionRange) return;
+  const input = $('messageInput');
+  input.setRangeText('@[' + name + '] ', mentionRange[0], mentionRange[1], 'end');
+  closeMentionMenu(); input.focus();
+  input.dispatchEvent(new Event('input', {bubbles:true}));
+}
+$('messageInput').addEventListener('click', updateMentionMenu);
+$('messageInput').addEventListener('keyup', e => { if (!['ArrowUp','ArrowDown','Enter','Escape'].includes(e.key)) updateMentionMenu(); });
+$('messageInput').addEventListener('blur', () => { setTimeout(() => { if (!mentionMenu.contains(document.activeElement)) closeMentionMenu(); }, 120); });
 $('messageInput').addEventListener('input', () => {
   clearTimeout(typingTimer);
   announceTyping(Boolean($('messageInput').value.trim()));
   if ($('messageInput').value.trim()) typingTimer = setTimeout(() => announceTyping(false), 1800);
+  updateMentionMenu();
 });
 setInterval(refreshTypingIndicator, 900);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markConversationSeen(); });
 $('messageInput').addEventListener('keydown', event => {
+  if (!mentionMenu.hidden) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); mentionSelection = (mentionSelection + (event.key === 'ArrowDown' ? 1 : -1) + mentionCandidates.length) % mentionCandidates.length; updateMentionMenu(); return; }
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); chooseMention(mentionSelection); return; }
+    if (event.key === 'Escape') { event.preventDefault(); closeMentionMenu(); return; }
+  }
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault(); $('messageForm').requestSubmit();
   }
