@@ -23,7 +23,7 @@
           <ul id="users"></ul>
         </aside>
         <div id="sidebarResize" class="sidebar-resize-handle" role="separator" aria-label="Resize user list" aria-orientation="vertical" tabindex="0"></div>
-        <div class="chat-main">
+        <div class="chat-main"><div class="chat-bg-layer" aria-hidden="true"></div>
           <div id="settingsScreen" class="settings-screen" hidden>
             <div class="settings-title"><strong>Settings</strong><button id="settingsClose" type="button" aria-label="Close settings">✕</button></div>
             <details class="settings-group" open><summary>Profile <span>⌄</span></summary><div class="settings-group-body">
@@ -60,6 +60,14 @@
             <label class="settings-field">Chat colour theme
               <select id="chatTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
             </label>
+            <div class="settings-field bg-settings">
+              <span>Chat background image</span>
+              <div class="bg-upload-actions"><label class="avatar-upload-label" for="chatBackgroundFile">Upload background</label><input id="chatBackgroundFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button id="removeChatBackground" type="button">Remove</button></div>
+              <small id="chatBackgroundStatus" class="settings-hint">No custom background selected</small>
+              <label class="settings-field">Background blur <output id="backgroundBlurValue">0px</output><input id="backgroundBlur" type="range" min="0" max="24" value="0" step="1"></label>
+              <label class="settings-field">Background opacity <output id="backgroundOpacityValue">100%</output><input id="backgroundOpacity" type="range" min="0" max="100" value="100" step="5"></label>
+              <small class="settings-hint">The picture fills the conversation without stretching. Surrounding panels use colours sampled from the image.</small>
+            </div>
             <label class="settings-field">Online user list position
               <select id="sidebarPosition"><option value="left">Left</option><option value="right">Right</option></select>
             </label>

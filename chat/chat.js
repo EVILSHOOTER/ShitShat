@@ -1,20 +1,30 @@
 import { joinRoom } from 'https://esm.run/trystero@0.26.0';
 
 // All visitors must use the same app ID and room ID.
-const APP_ID = 'com.example.my-website-chat-2026';
-const ROOM_ID = 'public-lobby';
-const MAX_HISTORY = 300;
+const roomConfig = document.getElementById('chatWidget')?.dataset || {};
+// All participants in a room must use matching IDs.
+const APP_ID = roomConfig.appId?.trim() || 'com.example.my-website-chat-2026';
+const ROOM_ID = roomConfig.roomId?.trim() || 'public-lobby';
+const configNumber = (key, fallback, min, max) => {
+  const raw = roomConfig[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+};
+const configBoolean = (key, fallback) => roomConfig[key] === 'true' ? true : roomConfig[key] === 'false' ? false : fallback;
+const configChoice = (key, values, fallback) => values.includes(roomConfig[key]) ? roomConfig[key] : fallback;
+const MAX_HISTORY = configNumber('historyLimit', 300, 50, 1000);
 const DEFAULT_NAME_COLOUR = '#a5c4ff';
 const DEFAULT_BUBBLE_COLOUR = '#304f92';
 const validColour = value => typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : null;
 const FONTS = {sans: 'system-ui, sans-serif', serif: 'Georgia, serif', mono: 'ui-monospace, monospace', comic: 'Comic Sans MS, Comic Sans, cursive', cursive: 'cursive'};
 const SIZES = {small: '.85em', normal: '1em', large: '1.25em', xlarge: '1.6em'};
 const HISTORY_SYNC_LIMIT = 100;
-const AWAY_AFTER_MS = 5 * 60 * 1000;
+const AWAY_AFTER_MS = configNumber('awayMinutes', 5, 1, 60) * 60 * 1000;
 const AVATAR_DATA_LIMIT = 18000;
 const IMAGE_DATA_LIMIT = 75000; // compressed data URL, kept small for peer-to-peer transport
-const LONG_MESSAGE_CHARS = 450;
-const LONG_MESSAGE_LINES = 7;
+const LONG_MESSAGE_CHARS = configNumber('longMessageChars', 450, 100, 5000);
+const LONG_MESSAGE_LINES = configNumber('longMessageLines', 7, 2, 30);
 const validAvatar = value => typeof value === 'string' && value.length <= AVATAR_DATA_LIMIT &&
   /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value) ? value : null;
 const $ = id => document.getElementById(id);
@@ -88,7 +98,7 @@ window.addEventListener('offline', () => setConnectionStatus('disconnected'));
 window.addEventListener('online', () => { if (room) setConnectionStatus(peers.size ? 'connected' : 'waiting'); });
 
 let unreadMessages = 0;
-let sidebarWidth = 155;
+let sidebarWidth = configNumber('sidebarWidth', 130, 65, 500);
 let syncPending = false;
 let syncCompleted = false;
 let syncTimer = null;
@@ -191,7 +201,7 @@ function setChatOpen(open) {
     unreadMessages = 0;
     badge.hidden = true;
     badge.textContent = '0';
-    requestAnimationFrame(scrollBottom);
+    requestAnimationFrame(() => { setSidebarWidth(sidebarWidth); scrollBottom(); });
     markConversationSeen();
   }
 }
@@ -922,21 +932,145 @@ $('emojiToggle').addEventListener('click', () => { $('emojiPicker').hidden = !$(
 
 // Settings (persisted locally, easy to extend later).
 const prefs = load('community-chat-preferences', {});
-let density = Number.isFinite(prefs.density) ? clamp(prefs.density, 75, 125) : 100;
-let hideTimes = Boolean(prefs.hideTimes);
-let hideTyping = Boolean(prefs.hideTyping);
-let hideImages = prefs.hideImages !== false;
-let hideAvatars = Boolean(prefs.hideAvatars);
+let density = Number.isFinite(prefs.density) ? clamp(prefs.density, 75, 125) : configNumber('density', 100, 75, 125);
+let hideTimes = prefs.hideTimes !== undefined ? Boolean(prefs.hideTimes) : configBoolean('hideTimestamps', false);
+let hideTyping = prefs.hideTyping !== undefined ? Boolean(prefs.hideTyping) : configBoolean('hideTyping', false);
+let hideImages = prefs.hideImages !== undefined ? Boolean(prefs.hideImages) : configBoolean('hideImages', true);
+let hideAvatars = prefs.hideAvatars !== undefined ? Boolean(prefs.hideAvatars) : configBoolean('hideAvatars', false);
 let avatar = validAvatar(load('community-chat-avatar', null));
-let advancedFormatting = Boolean(prefs.advancedFormatting);
-let hideReceipts = Boolean(prefs.hideReceipts);
-let avatarRadius = Number.isFinite(prefs.avatarRadius) ? clamp(prefs.avatarRadius,0,50) : 10;
-let compactMode = Boolean(prefs.compactMode);
-let chatTheme = prefs.chatTheme === 'light' ? 'light' : 'dark';
-let sidebarPosition = prefs.sidebarPosition === 'right' ? 'right' : 'left';
-let nameColour = validColour(prefs.nameColour) || DEFAULT_NAME_COLOUR;
-let bubbleColour = validColour(prefs.bubbleColour) || DEFAULT_BUBBLE_COLOUR;
+let advancedFormatting = prefs.advancedFormatting !== undefined ? Boolean(prefs.advancedFormatting) : configBoolean('advancedFormatting', false);
+let hideReceipts = prefs.hideReceipts !== undefined ? Boolean(prefs.hideReceipts) : configBoolean('hideReceipts', false);
+let avatarRadius = Number.isFinite(prefs.avatarRadius) ? clamp(prefs.avatarRadius,0,50) : configNumber('avatarRadius', 10, 0, 50);
+let compactMode = prefs.compactMode !== undefined ? Boolean(prefs.compactMode) : configBoolean('compactMode', false);
+let chatTheme = prefs.chatTheme !== undefined ? (prefs.chatTheme === 'light' ? 'light' : 'dark') : configChoice('theme', ['light','dark'], 'dark');
+let sidebarPosition = prefs.sidebarPosition !== undefined ? (prefs.sidebarPosition === 'right' ? 'right' : 'left') : configChoice('sidebarPosition', ['left','right'], 'left');
+let nameColour = validColour(prefs.nameColour) || validColour(roomConfig.nameColour) || DEFAULT_NAME_COLOUR;
+let bubbleColour = validColour(prefs.bubbleColour) || validColour(roomConfig.bubbleColour) || DEFAULT_BUBBLE_COLOUR;
+// The image is stored locally, never broadcast to peers. Use a small JPEG to
+// keep localStorage usage predictable. Sample a downscaled canvas for colours.
+let chatBackground = load('community-chat-background-v1', null);
+if (!chatBackground || typeof chatBackground.image !== 'string' || !/^data:image\/jpeg;base64,/.test(chatBackground.image) || chatBackground.image.length > 1600000 || !Array.isArray(chatBackground.rgb)) chatBackground = null;
+const backgroundWasCustomized = load('community-chat-background-choice-v1', false) === true;
+const configuredBackgroundUrl = (() => { try { const url = new URL(roomConfig.backgroundUrl || '', document.baseURI); return ['http:', 'https:'].includes(url.protocol) && roomConfig.backgroundUrl ? url.href : null; } catch { return null; } })();
+let gifBackgroundUrl = null;
+const GIF_DB = 'community-chat-background-gif';
+function gifStore(mode, task) {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) { reject(Error('This browser does not support GIF storage.')); return; }
+    const request = indexedDB.open(GIF_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('images');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('images', mode);
+      const query = task(transaction.objectStore('images'));
+      query.onsuccess = () => resolve(query.result);
+      query.onerror = () => reject(query.error);
+      transaction.oncomplete = () => db.close();
+      transaction.onerror = () => reject(transaction.error);
+    };
+  });
+}
+function releaseGifUrl() { if (gifBackgroundUrl) URL.revokeObjectURL(gifBackgroundUrl); gifBackgroundUrl = null; }
+async function restoreGifBackground() {
+  try {
+    const stored = await gifStore('readonly', store => store.get('current'));
+    if (stored?.blob instanceof Blob && stored.blob.type === 'image/gif' && stored.blob.size <= 8 * 1024 * 1024) {
+      releaseGifUrl(); gifBackgroundUrl = URL.createObjectURL(stored.blob);
+      chatBackground = {image:gifBackgroundUrl, rgb:stored.rgb};
+      applyPreferences();
+    }
+  } catch (error) { console.warn('[Community Chat] GIF background unavailable:',error); }
+}
+async function loadConfiguredBackground() {
+  if (!configuredBackgroundUrl || backgroundWasCustomized || chatBackground) return;
+  // A cross-origin image can still be displayed even if its host forbids canvas sampling.
+  const fallback = chatTheme === 'light' ? [205,215,230] : [34,45,70];
+  chatBackground = {image: configuredBackgroundUrl, rgb: fallback};
+  applyBackground();
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    if (chatBackground?.image !== configuredBackgroundUrl) return;
+    try {
+      const canvas = document.createElement('canvas'); canvas.width=24; canvas.height=24;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(img,0,0,24,24);
+      const pixels = ctx.getImageData(0,0,24,24).data;
+      let r=0,g=0,b=0,n=0;
+      for (let i=0;i<pixels.length;i+=4) { if (pixels[i+3]<100) continue; r+=pixels[i];g+=pixels[i+1];b+=pixels[i+2];n++; }
+      if (n) { chatBackground.rgb=[r/n,g/n,b/n]; applyBackground(); }
+    } catch { /* CORS-blocked images still display with a theme-based palette. */ }
+  };
+  img.src=configuredBackgroundUrl;
+}
+let backgroundBlur = Number.isFinite(prefs.backgroundBlur) ? clamp(prefs.backgroundBlur,0,24) : configNumber('backgroundBlur', 0, 0, 24);
+let backgroundOpacity = Number.isFinite(prefs.backgroundOpacity) ? clamp(prefs.backgroundOpacity,0,100) : configNumber('backgroundOpacity', 100, 0, 100);
+const rgbCss = (rgb, a=1) => `rgba(${rgb.map(x=>Math.round(x)).join(',')},${a})`;
+function backgroundPalette(rgb) {
+  const luminance = (rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722)/255;
+  const dark = luminance < .56;
+  const blend=(a,b,t)=>a.map((v,i)=>Math.round(v*(1-t)+b[i]*t));
+  const surface=blend(rgb,dark?[8,14,28]:[250,252,255],dark?.69:.79);
+  const deep=blend(rgb,dark?[5,9,19]:[244,247,251],dark?.82:.89);
+  const text=dark?'#f5f7ff':'#172335';
+  const muted=dark?'#c0cde1':'#42516a';
+  const control=blend(surface,dark?[45,58,82]:[218,227,239],.38);
+  const bubble=blend(surface,dark?[52,68,96]:[215,225,240],.48);
+  const root=$('chatWidget');
+  root.style.setProperty('--bg-surface',rgbCss(surface));
+  root.style.setProperty('--bg-deep',rgbCss(deep));
+  root.style.setProperty('--bg-text',text);
+  root.style.setProperty('--bg-muted',muted);
+  root.style.setProperty('--bg-border',rgbCss(blend(surface,dark?[125,146,175]:[90,110,140],.27)));
+  root.style.setProperty('--bg-control',rgbCss(control));
+  root.style.setProperty('--bg-bubble',rgbCss(bubble,.95));
+  root.style.setProperty('--bg-wash',dark?'rgba(3,8,18,.34)':'rgba(250,252,255,.34)');
+}
+function applyBackground() {
+  const root=$('chatWidget');
+  root.classList.toggle('has-chat-background',!!chatBackground);
+  root.style.setProperty('--bg-blur',backgroundBlur+'px');
+  root.style.setProperty('--bg-opacity',String(backgroundOpacity/100));
+  $('backgroundBlur').value=String(backgroundBlur);
+  $('backgroundBlurValue').textContent=backgroundBlur+'px';
+  $('backgroundOpacity').value=String(backgroundOpacity);
+  $('backgroundOpacityValue').textContent=backgroundOpacity+'%';
+  $('chatBackgroundStatus').textContent=chatBackground?'Custom background active':'No custom background selected';
+  if(chatBackground){
+    root.style.setProperty('--bg-image',`url("${chatBackground.image}")`);
+    backgroundPalette(chatBackground.rgb);
+  } else root.style.removeProperty('--bg-image');
+}
+function prepareBackground(file) {
+  if (!file.type.startsWith('image/') || file.size > 12*1024*1024) throw Error('Choose an image under 12 MB.');
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file), image=new Image();
+    image.onload=()=>{
+      URL.revokeObjectURL(url);
+      try {
+        const scale=Math.min(1,1280/image.width,900/image.height);
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(image.width*scale));
+        canvas.height=Math.max(1,Math.round(image.height*scale));
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(image,0,0,canvas.width,canvas.height);
+        const imageData=file.type==='image/gif' ? null : canvas.toDataURL('image/jpeg',.75);
+        if(imageData && imageData.length>1600000) throw Error('Image is too complex to store. Try a smaller picture.');
+        const sw=document.createElement('canvas');sw.width=24;sw.height=24;
+        const sc=sw.getContext('2d',{willReadFrequently:true});sc.drawImage(image,0,0,24,24);
+        const pixels=sc.getImageData(0,0,24,24).data;
+        let r=0,g=0,b=0,n=0;
+        for(let i=0;i<pixels.length;i+=4){if(pixels[i+3]<100)continue;r+=pixels[i];g+=pixels[i+1];b+=pixels[i+2];n++;}
+        resolve({image:imageData,rgb:[r/n||30,g/n||40,b/n||60]});
+      }catch(e){reject(e);}
+    };
+    image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('Could not read this image.'));};
+    image.src=url;
+  });
+}
+
 function applyPreferences() {
+  applyBackground();
   $('chatWidget').style.setProperty('--chat-scale', String(density / 100));
   $('densitySlider').value = String(density);
   $('densityValue').textContent = density + '%';
@@ -962,9 +1096,35 @@ function applyPreferences() {
   $('chatWidget').classList.toggle('hide-times', hideTimes);
   $('nameColour').value = nameColour; $('nameColourValue').textContent = nameColour;
   $('bubbleColour').value = bubbleColour; $('bubbleColourValue').textContent = bubbleColour;
-  save('community-chat-preferences', {density, hideTimes, hideTyping, hideImages, hideAvatars, advancedFormatting, hideReceipts, chatTheme, sidebarPosition, nameColour, bubbleColour, avatarRadius, compactMode});
+  save('community-chat-preferences', {density, hideTimes, hideTyping, hideImages, hideAvatars, advancedFormatting, hideReceipts, chatTheme, sidebarPosition, nameColour, bubbleColour, avatarRadius, compactMode, backgroundBlur, backgroundOpacity});
 }
 applyPreferences();
+$('chatBackgroundFile').addEventListener('change', async e => {
+  const file=e.target.files?.[0]; if(!file)return;
+  try {
+    if (!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)) throw Error('Choose a JPEG, PNG, WebP or GIF.');
+    if (file.type === 'image/gif' && file.size > 8 * 1024 * 1024) throw Error('GIF must be under 8 MB.');
+    const result = await prepareBackground(file);
+    if (file.type === 'image/gif') {
+      // Preserve the original GIF bytes: canvas.toDataURL() would freeze its animation.
+      await gifStore('readwrite', store => store.put({blob:file, rgb:result.rgb}, 'current'));
+      releaseGifUrl(); gifBackgroundUrl = URL.createObjectURL(file);
+      chatBackground = {image:gifBackgroundUrl, rgb:result.rgb};
+      save('community-chat-background-v1',null);
+    } else {
+      save('community-chat-background-v1',result);
+      if(load('community-chat-background-v1',null)?.image!==result.image) throw Error('Browser storage is full. Try a smaller picture.');
+      await gifStore('readwrite',store=>store.delete('current')).catch(()=>{});
+      releaseGifUrl(); chatBackground=result;
+    }
+    save('community-chat-background-choice-v1', true);
+    applyPreferences();
+  } catch(error){ alert(error.message||'Unable to use background image.'); }
+  finally{e.target.value='';}
+});
+$('removeChatBackground').addEventListener('click',()=>{save('community-chat-background-choice-v1',true);chatBackground=null;releaseGifUrl();save('community-chat-background-v1',null);gifStore('readwrite',store=>store.delete('current')).catch(()=>{});applyPreferences();});
+$('backgroundBlur').addEventListener('input',e=>{backgroundBlur=Number(e.target.value);applyPreferences();});
+$('backgroundOpacity').addEventListener('input',e=>{backgroundOpacity=Number(e.target.value);applyPreferences();});
 $('nameColour').addEventListener('input', async event => {
   nameColour = validColour(event.target.value) || DEFAULT_NAME_COLOUR;
   applyPreferences(); renderUsers();
@@ -1032,7 +1192,7 @@ function setWidgetSize(width, height) {
 const savedSize = load(SIZE_KEY, null);
 if (savedSize && Number.isFinite(savedSize.width) && Number.isFinite(savedSize.height))
   setWidgetSize(savedSize.width, savedSize.height);
-else setWidgetSize(390, 500);
+else setWidgetSize(configNumber('widgetWidth', 440, 280, 1200), configNumber('widgetHeight', 500, 240, 1000));
 
 function attachDrag(handle, className, onMove, onEnd) {
   handle.addEventListener('pointerdown', event => {
@@ -1064,15 +1224,18 @@ attachDrag($('chatResize'), 'chat-resizing', (dx, dy) => {
   setSidebarWidth(sidebarWidth);
 }, () => save(SIZE_KEY, {width: panel.offsetWidth, height: panel.offsetHeight}));
 
-sidebarWidth = load(SIDEBAR_KEY, 155);
-if (!Number.isFinite(sidebarWidth)) sidebarWidth = 155;
+sidebarWidth = load(SIDEBAR_KEY, configNumber('sidebarWidth', 130, 65, 500));
+if (!Number.isFinite(sidebarWidth)) sidebarWidth = configNumber('sidebarWidth', 130, 65, 500);
 function setSidebarWidth(width) {
-  const available = content.clientWidth;
-  sidebarWidth = clamp(width, 65, Math.max(65, available - 155));
+  // Keep the requested width even while the widget is hidden or the viewport is narrow.
+  // Only clamp the rendered width, so opening/resizing doesn't erase the saved preference.
+  sidebarWidth = clamp(width, 65, 500);
+  const available = content.clientWidth || panel.clientWidth || 390;
+  const displayedWidth = clamp(sidebarWidth, 65, Math.max(65, available - 155));
   if (!content.classList.contains('users-collapsed'))
-    content.style.gridTemplateColumns = sidebarPosition === 'right' ? `minmax(0, 1fr) 5px ${sidebarWidth}px` : `${sidebarWidth}px 5px minmax(0, 1fr)`;
+    content.style.gridTemplateColumns = sidebarPosition === 'right' ? `minmax(0, 1fr) 5px ${displayedWidth}px` : `${displayedWidth}px 5px minmax(0, 1fr)`;
 }
-let sidebarStartWidth = 155;
+let sidebarStartWidth = sidebarWidth;
 $('sidebarResize').addEventListener('pointerdown', () => { sidebarStartWidth = sidebarWidth; }, {capture: true});
 attachDrag($('sidebarResize'), 'sidebar-resizing', dx => setSidebarWidth(sidebarStartWidth + (sidebarPosition === 'right' ? -dx : dx)),
   () => save(SIDEBAR_KEY, sidebarWidth));
@@ -1099,3 +1262,5 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('pagehide', () => { if (room) { try { room.leave(); } catch {} } });
 setChatOpen(false);
+
+restoreGifBackground().then(() => loadConfiguredBackground());

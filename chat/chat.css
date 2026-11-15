@@ -56,7 +56,7 @@
 .chat-widget .header-button:hover { background: #38517b; }
 
 
-.chat-widget .chat-content { display: grid; grid-template-columns: 112px 5px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
+.chat-widget .chat-content { display: grid; grid-template-columns: 185px 5px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
 
 
 .chat-widget .chat-content.users-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
@@ -999,3 +999,52 @@ body.sidebar-resizing, body.sidebar-resizing * { user-select: none !important; c
   justify-self: stretch !important;
   align-self: stretch !important;
 }
+
+/* Custom image theme: cover avoids stretching, sampled colours tint the surrounding chrome. */
+.chat-widget.has-chat-background .chat-panel { background:var(--bg-deep) !important; color:var(--bg-text); }
+.chat-widget.has-chat-background .chat-header,
+.chat-widget.has-chat-background .chat-sidebar,
+.chat-widget.has-chat-background .composer,
+.chat-widget.has-chat-background #messageForm,
+.chat-widget.has-chat-background .typing-indicator,
+.chat-widget.has-chat-background .conversation-bar { background:var(--bg-surface) !important; color:var(--bg-text); border-color:var(--bg-border) !important; }
+.chat-widget.has-chat-background .chat-main { background:var(--bg-deep); }
+.chat-widget.has-chat-background #messages { position:relative; isolation:isolate; background:var(--bg-deep); color:var(--bg-text); }
+.chat-widget.has-chat-background #messages::before { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background-image:var(--bg-image); background-size:cover; background-position:center; background-repeat:no-repeat; opacity:var(--bg-opacity); filter:blur(var(--bg-blur)); transform:scale(1.08); }
+/* The backdrop is pinned to the chat viewport, not each message. */
+.chat-widget.has-chat-background #messages { background-image:linear-gradient(var(--bg-wash),var(--bg-wash)),var(--bg-image); background-size:cover; background-position:center; background-attachment:local; }
+.chat-widget.has-chat-background #messages::before { display:none; }
+.chat-widget.has-chat-background #users li,
+.chat-widget.has-chat-background .header-button,
+.chat-widget.has-chat-background .format-toolbar button,
+.chat-widget.has-chat-background #messageInput { background:var(--bg-control) !important; color:var(--bg-text) !important; border-color:var(--bg-border); }
+.chat-widget.has-chat-background .chat-heading small,
+.chat-widget.has-chat-background .system,
+.chat-widget.has-chat-background .message-time,
+.chat-widget.has-chat-background .typing-indicator { color:var(--bg-muted); }
+/* Coloured bubbles are for normal mode only. Compact mode must remain transparent,
+   including messages loaded from another peer's history. */
+.chat-widget.has-chat-background:not(.compact-mode) .message:not(.mine) { background:var(--bg-bubble) !important; color:var(--bg-text); }
+.chat-widget.has-chat-background .settings-screen { background:var(--bg-deep); color:var(--bg-text); }
+.chat-widget .bg-upload-actions { display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+.chat-widget #removeChatBackground { background:#263653; color:#e8ecf7; border:0; border-radius:5px; padding:6px 9px; }
+.chat-widget[data-theme="light"] #removeChatBackground { background:#dce5f2; color:#263347; }
+.chat-widget .bg-settings > .settings-hint { margin:0; }
+
+.chat-widget.has-chat-background .chat-main::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; background:var(--bg-deep); }
+.chat-widget.has-chat-background #messages { background:none !important; }
+.chat-widget.has-chat-background #messages::before { display:block; position:sticky; top:0; height:0; width:100%; transform:none; background:none; }
+.chat-widget.has-chat-background .chat-main > .chat-bg-layer { position:absolute; top:0; bottom:0; left:0; right:0; z-index:0; pointer-events:none; overflow:hidden; }
+.chat-widget.has-chat-background .chat-bg-layer::before { content:""; position:absolute; inset:-30px; background-image:var(--bg-image); background-position:center; background-size:cover; background-repeat:no-repeat; opacity:var(--bg-opacity); filter:blur(var(--bg-blur)); }
+.chat-widget.has-chat-background .chat-bg-layer::after { content:""; position:absolute; inset:0; background:var(--bg-wash); }
+/* Only ordinary chat sections belong in the flex flow. Overlay screens must
+   retain position:absolute, otherwise they push the chatroom out of view. */
+.chat-widget.has-chat-background .chat-main > :is(#messages, .conversation-bar, .composer, .typing-indicator, .reply-preview) { position:relative; z-index:1; }
+.chat-widget.has-chat-background .chat-main > .settings-screen { position:absolute; inset:0; z-index:3; }
+.chat-widget.has-chat-background .chat-main > .avatar-lightbox { position:absolute; inset:0; z-index:30; }
+.chat-widget.has-chat-background .chat-main > .join-screen { position:absolute; inset:0; z-index:2; }
+.chat-widget.has-chat-background .chat-main > #messages { background:transparent !important; }
+
+/* Keep sidebar usernames legible in the light theme even with custom name colours. */
+.chat-widget[data-theme="light"] #users .user-name:not(.ignored) { color:#263f64 !important; }
+.chat-widget[data-theme="light"].has-chat-background #users .user-name:not(.ignored) { color:var(--bg-text) !important; }

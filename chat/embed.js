@@ -2,7 +2,16 @@
 (() => {
   if (document.getElementById('chatWidget') || window.__communityChatEmbedding) return;
   window.__communityChatEmbedding = true;
-  const base = new URL('.', document.currentScript.src);
+  const embedTag = document.currentScript;
+  const base = new URL('.', embedTag.src);
+  const appId = embedTag.getAttribute('data-app-id');
+  const roomId = embedTag.getAttribute('data-room-id');
+  // Forward only documented, optional settings; chat.js validates each value.
+  const settings = ['backgroundUrl','backgroundBlur','backgroundOpacity','theme',
+    'sidebarWidth','sidebarPosition','compactMode','density','avatarRadius',
+    'hideImages','hideAvatars','hideTyping','hideReceipts','hideTimestamps',
+    'advancedFormatting','nameColour','bubbleColour','widgetWidth','widgetHeight',
+    'historyLimit','awayMinutes','longMessageChars','longMessageLines'];
   async function mount() {
     try {
       const response = await fetch(new URL('widget.html', base));
@@ -18,6 +27,9 @@
       host.innerHTML = html;
       const widget = host.querySelector('#chatWidget');
       if (!widget) throw new Error('Missing chatWidget in widget.html');
+      if (appId) widget.dataset.appId = appId;
+      if (roomId) widget.dataset.roomId = roomId;
+      for (const key of settings) { if (embedTag.dataset[key] !== undefined) widget.dataset[key] = embedTag.dataset[key]; }
       document.body.append(widget);
       const script = document.createElement('script');
       script.type = 'module';

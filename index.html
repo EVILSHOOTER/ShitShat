@@ -9,8 +9,28 @@
     main { max-width: 760px; margin: 5rem auto; padding: 0 24px; }
     .panel { padding: 20px; background: white; border: 1px solid #dae1ed; border-radius: 12px; }
   </style>
-  <!-- The only line needed to add the chat widget to this page: -->
-  <script src="chat/embed.js" defer></script>
+  <!-- Every data-* attribute is optional. Remove any you do not want. -->
+  <script src="chat/embed.js"
+    data-app-id="com.example.my-website-chat-2026"
+    data-room-id="public-lobby"
+    data-theme="dark"
+    data-sidebar-width="130"
+    data-sidebar-position="left"
+    data-widget-width="440"
+    data-widget-height="500"
+    data-background-url="http://img4.wikia.nocookie.net/__cb20120730200249/ipod/images/6/65/Earth_and_Moon.jpg"
+    data-background-blur="3"
+    data-background-opacity="65"
+    data-compact-mode="false"
+    data-density="100"
+    data-avatar-radius="10"
+    data-hide-images="true"
+    data-hide-typing="false"
+    data-hide-receipts="false"
+    data-hide-timestamps="false"
+    data-away-minutes="5"
+    data-long-message-chars="450"
+    defer></script>
 </head>
 <body>
   <main>
@@ -19,6 +39,7 @@
       <p>This is a completely separate HTML page.</p>
       <p>The chat is loaded from the <code>chat/</code> folder using a single script tag.</p>
       <p>Open the chat button in the bottom-right corner to try it.</p>
+      <p>The script tag in this page demonstrates optional settings such as a background URL, blur, opacity, theme and sidebar width. Edit or remove them to see the defaults. Saved browser preferences take precedence.</p>
     </div>
   </main>
 </body>
