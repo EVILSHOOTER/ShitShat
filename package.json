@@ -1,0 +1,8 @@
+{
+  "name": "@evilshooter/shitshat",
+  "version": "1.0.0",
+  "description": "Embeddable peer-to-peer community chat widget",
+  "license": "MIT",
+  "files": ["chat/"],
+  "exports": {"./embed.js": "./chat/embed.js", "./chat/*": "./chat/*"}
+}

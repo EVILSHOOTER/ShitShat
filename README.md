@@ -14,10 +14,14 @@ features:
 - INTENTIONALLY limited
 
 
-## how to use
-- save the files in your static site (except index.html ig)
-- add `<script src="/chat/embed.js" defer></script>` to any page
+# how to use
+## easy
+- add this to your html: `<script src="https://cdn.jsdelivr.net/gh/EVILSHOOTER/ShitShat@main/chat/embed.js" defer></script>` and you're done
     - add any HTML attributes to change the default settings (check out index.html for all the ones you can change)
+## slightly alternative
+- alternatively, download the "chat" folder and put it on your site.
+    - then add something like `<script src="/chat/embed.js" defer></script>` to any page, that'll work too
+    
 
 
 ## talking for the sake of talking
